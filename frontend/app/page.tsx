@@ -72,12 +72,20 @@ export default function Home() {
 
   const scanAll = async () => {
     setLoading(true)
-    await axios.post(`${API_BASE}/scan/reddit`)
-    await axios.post(`${API_BASE}/scan/regulatory`)
-    await axios.post(`${API_BASE}/scan/x`)
-    await fetchIncidents()
-    setLoading(false)
+
+    try {
+      await Promise.allSettled([
+        axios.post(`${API_BASE}/scan/reddit`),
+        axios.post(`${API_BASE}/scan/regulatory`),
+        axios.post(`${API_BASE}/scan/x`),
+      ])
+
+      await fetchIncidents()
+    } finally {
+      setLoading(false)
+    }
   }
+
 
   const updateIncident = async (
     id: number,
