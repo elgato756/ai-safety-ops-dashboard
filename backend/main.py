@@ -10,6 +10,7 @@ from ai.classifier import classify_content
 from db.database import create_db_and_tables, get_session
 from ingestion.reddit_ingest import fetch_reddit_posts
 from ingestion.regulatory_ingest import fetch_regulatory_signals
+from ingestion.x_ingest import fetch_x_signals
 from models.audit_log import AuditLog
 from models.incident import Incident
 from services.audit_service import (
@@ -161,6 +162,53 @@ def scan_regulatory(session: Session = Depends(get_session)):
 
     return {
         "source": "regulatory_monitor",
+        "created": len(created_incidents),
+        "incidents": created_incidents,
+    }
+
+
+@app.post("/scan/x")
+def scan_x(session: Session = Depends(get_session)):
+    signals = fetch_x_signals(limit=10)
+    created_incidents = []
+    threshold = escalation_threshold()
+
+    for signal in signals:
+        analysis = classify_content(
+            title=signal["title"],
+            body=signal.get("body", ""),
+        )
+
+        incident = create_incident_from_signal(
+            session=session,
+            signal=signal,
+            analysis=analysis,
+        )
+
+        if incident:
+            created_incidents.append(incident)
+
+            create_audit_event(
+                session=session,
+                incident_id=incident.id,
+                action="incident_created",
+                details="Created from X scan.",
+            )
+
+            if incident.should_escalate or incident.severity >= threshold:
+                send_slack_alert(incident)
+                create_audit_event(
+                    session=session,
+                    incident_id=incident.id,
+                    action="auto_escalation_recommended",
+                    details=(
+                        f"X signal met escalation criteria. "
+                        f"Severity={incident.severity}, threshold={threshold}."
+                    ),
+                )
+
+    return {
+        "source": "x",
         "created": len(created_incidents),
         "incidents": created_incidents,
     }
