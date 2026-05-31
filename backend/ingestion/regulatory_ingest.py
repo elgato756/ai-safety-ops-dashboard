@@ -1,4 +1,47 @@
-OFFICIAL_REGULATORY_SIGNALS = [
+import re
+from datetime import datetime
+
+import requests
+
+
+OFFICIAL_POLICY_SOURCES = [
+    {
+        "id": "official_nist_ai_rmf_live",
+        "url": "https://www.nist.gov/itl/ai-risk-management-framework",
+        "source_community": "NIST AI Risk Management Framework",
+        "jurisdiction": "US",
+        "authority": "NIST",
+        "compliance_area": "ai_risk_management_governance",
+        "title": "NIST AI Risk Management Framework official source monitor",
+        "source_type": "official",
+        "verification_status": "official_source_verified",
+    },
+    {
+        "id": "official_eu_ai_act_timeline_live",
+        "url": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act",
+        "source_community": "European Commission AI Act Service Desk",
+        "jurisdiction": "EU",
+        "authority": "European Commission",
+        "compliance_area": "governance_transparency_risk_management",
+        "title": "EU AI Act implementation timeline official source monitor",
+        "source_type": "official",
+        "verification_status": "official_source_verified",
+    },
+    {
+        "id": "official_eurlex_ai_act_text_live",
+        "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+        "source_community": "EUR-Lex Official Journal",
+        "jurisdiction": "EU",
+        "authority": "European Union",
+        "compliance_area": "ai_act_legal_text",
+        "title": "EU Artificial Intelligence Act official legal text monitor",
+        "source_type": "official",
+        "verification_status": "official_source_verified",
+    },
+]
+
+
+OFFICIAL_FALLBACK_SIGNALS = [
     {
         "id": "official_eu_ai_act_timeline_001",
         "source": "regulatory_monitor",
@@ -39,73 +82,110 @@ OFFICIAL_REGULATORY_SIGNALS = [
         "score": 95,
     },
     {
-        "id": "official_ftc_ai_claims_001",
+        "id": "official_eurlex_ai_act_001",
         "source": "regulatory_monitor",
         "source_type": "official",
         "verification_status": "official_source_verified",
-        "jurisdiction": "US",
-        "authority": "FTC",
-        "compliance_area": "consumer_protection_marketing_claims_fraud",
+        "jurisdiction": "EU",
+        "authority": "European Union",
+        "compliance_area": "ai_act_legal_text",
         "effective_date": None,
-        "source_community": "Federal Trade Commission",
-        "title": "FTC materials indicate AI claims and consumer protection risks require careful review",
+        "source_community": "EUR-Lex Official Journal",
+        "title": "Official EU Artificial Intelligence Act legal text should be monitored for policy mapping",
         "body": (
-            "Official FTC materials are relevant to AI-related consumer protection, misleading claims, fraud, "
-            "deceptive practices, privacy, and substantiation of product or safety claims. This signal should be "
-            "reviewed by legal/policy teams before interpreting it as a specific compliance obligation."
+            "EUR-Lex hosts the official text of Regulation (EU) 2024/1689, the Artificial Intelligence Act. "
+            "This should be treated as a source-of-truth reference for legal/policy review rather than interpreted "
+            "automatically by the system."
         ),
-        "url": "https://www.ftc.gov/",
-        "score": 90,
-    },
-    {
-        "id": "official_uk_aisi_001",
-        "source": "regulatory_monitor",
-        "source_type": "official",
-        "verification_status": "official_source_verified",
-        "jurisdiction": "UK",
-        "authority": "UK AI Security Institute",
-        "compliance_area": "frontier_ai_safety_evaluation",
-        "effective_date": None,
-        "source_community": "UK AI Security Institute",
-        "title": "UK AI Security Institute publications may inform frontier AI safety evaluation expectations",
-        "body": (
-            "Official UK AI Security Institute materials may be relevant to frontier AI safety research, evaluations, "
-            "capability assessments, safeguards, and mitigations. This should be treated as a policy monitoring signal "
-            "and reviewed by policy/safety teams."
-        ),
-        "url": "https://www.aisi.gov.uk/",
-        "score": 85,
+        "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+        "score": 100,
     },
 ]
 
 
-SECONDARY_MONITORING_LEADS = [
-    {
-        "id": "secondary_state_ai_legislation_001",
-        "source": "regulatory_monitor",
-        "source_type": "secondary",
-        "verification_status": "monitoring_lead_requires_verification",
-        "jurisdiction": "US",
-        "authority": "State-level AI policy monitoring",
-        "compliance_area": "state_ai_legislation",
-        "effective_date": None,
-        "source_community": "Policy monitoring lead",
-        "title": "State-level AI legislation chatter may indicate emerging compliance fragmentation",
-        "body": (
-            "Secondary monitoring suggests growing state-level attention to AI transparency, automated decision-making, "
-            "privacy, and consumer protection. This is not treated as a confirmed obligation until reviewed against "
-            "official state legislative or regulator sources."
-        ),
-        "url": "https://www.ncsl.org/technology-and-communication/artificial-intelligence-2025-legislation",
-        "score": 60,
+def _clean_html(html: str) -> str:
+    html = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.IGNORECASE)
+    html = re.sub(r"<style[\s\S]*?</style>", " ", html, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _extract_relevant_excerpt(text: str, keywords: list[str], max_chars: int = 1800) -> str:
+    lowered = text.lower()
+
+    for keyword in keywords:
+        idx = lowered.find(keyword.lower())
+        if idx != -1:
+            start = max(0, idx - 500)
+            end = min(len(text), idx + max_chars)
+            return text[start:end]
+
+    return text[:max_chars]
+
+
+def _fetch_official_source(source: dict) -> dict | None:
+    headers = {
+        "User-Agent": "ai-safety-ops-dashboard/0.1 official-policy-monitor"
     }
-]
+
+    try:
+        response = requests.get(source["url"], headers=headers, timeout=15)
+        response.raise_for_status()
+        text = _clean_html(response.text)
+
+        excerpt = _extract_relevant_excerpt(
+            text,
+            keywords=[
+                "artificial intelligence",
+                "AI Risk Management Framework",
+                "general-purpose AI",
+                "obligations",
+                "timeline",
+                "risk management",
+                "Regulation",
+            ],
+        )
+
+        if not excerpt:
+            return None
+
+        return {
+            "id": f'{source["id"]}_{datetime.utcnow().strftime("%Y%m%d")}',
+            "source": "regulatory_monitor",
+            "source_type": source["source_type"],
+            "verification_status": source["verification_status"],
+            "jurisdiction": source["jurisdiction"],
+            "authority": source["authority"],
+            "compliance_area": source["compliance_area"],
+            "effective_date": None,
+            "source_community": source["source_community"],
+            "title": source["title"],
+            "body": (
+                "Official policy source fetched for monitoring. "
+                "The following excerpt should be summarized for analyst review only; "
+                "do not treat the model output as legal advice or a final compliance decision.\n\n"
+                f"{excerpt}"
+            ),
+            "url": source["url"],
+            "score": 100,
+        }
+
+    except Exception as error:
+        print(f"Failed to fetch official policy source {source['url']}: {error}")
+        return None
 
 
-def fetch_regulatory_signals(limit=10, include_secondary=True):
-    signals = OFFICIAL_REGULATORY_SIGNALS.copy()
+def fetch_regulatory_signals(limit=10, include_secondary=False):
+    signals = []
 
-    if include_secondary:
-        signals.extend(SECONDARY_MONITORING_LEADS)
+    for source in OFFICIAL_POLICY_SOURCES:
+        fetched = _fetch_official_source(source)
+        if fetched:
+            signals.append(fetched)
+
+    if not signals:
+        print("Official policy source fetch failed. Using official fallback regulatory signals.")
+        signals = OFFICIAL_FALLBACK_SIGNALS.copy()
 
     return signals[:limit]
