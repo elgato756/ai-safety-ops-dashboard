@@ -141,3 +141,28 @@ Suggested framing:
 ## Responsible use disclaimer
 
 This prototype analyzes public content for demonstration purposes only. It should not be used to accuse individuals or groups of wrongdoing, make enforcement decisions, or conduct surveillance. Any production version would require privacy review, legal review, platform ToS review, robust audit logging, and human oversight.
+
+## Human-in-the-Loop Design
+
+This prototype is designed as an analyst-assist tool, not an automated enforcement system.
+
+The dashboard helps Trust & Safety teams:
+
+- aggregate emerging AI misuse and integrity signals
+- classify potential risks for review
+- prioritize incidents by severity and confidence
+- recommend appropriate review teams
+- support escalation workflows
+
+The system does not make final enforcement, account-level, policy, or legal decisions. Its purpose is to reduce detection latency and help human analysts focus on the highest-signal incidents.
+
+## Demo Features
+
+- Reddit signal ingestion with demo fallback data
+- AI-assisted risk classification
+- severity and confidence scoring
+- incident lifecycle states
+- escalation workflow simulation
+- dashboard filtering by risk type and status
+- local SQLite persistence
+
