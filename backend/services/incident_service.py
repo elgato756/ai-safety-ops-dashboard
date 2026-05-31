@@ -41,6 +41,14 @@ def create_incident_from_signal(session: Session, signal: dict, analysis: str | 
         source_id=source_id,
         source_url=signal.get("url"),
         source_community=signal.get("subreddit") or signal.get("source_community"),
+
+        source_type=signal.get("source_type"),
+        verification_status=signal.get("verification_status"),
+        jurisdiction=signal.get("jurisdiction"),
+        authority=signal.get("authority"),
+        compliance_area=signal.get("compliance_area"),
+        effective_date=signal.get("effective_date"),
+
         title=signal.get("title", "Untitled signal"),
         raw_content=signal.get("body", ""),
         category=parsed.get("category", "unknown"),

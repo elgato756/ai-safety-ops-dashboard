@@ -12,6 +12,13 @@ class Incident(SQLModel, table=True):
     source_url: Optional[str] = None
     source_community: Optional[str] = None
 
+    source_type: Optional[str] = None
+    verification_status: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    authority: Optional[str] = None
+    compliance_area: Optional[str] = None
+    effective_date: Optional[str] = None
+
     title: str
     raw_content: Optional[str] = None
 
