@@ -9,6 +9,7 @@ type Incident = {
   source_url?: string
   source_community?: string
   title: string
+  raw_content?: string
   category: string
   severity: number
   confidence: number
@@ -30,32 +31,73 @@ const FILTERS = [
   'Regulatory',
   'Fraud/scam',
   'Jailbreak',
+  'X',
 ]
 
 export default function Home() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(false)
   const [activeFilter, setActiveFilter] = useState('All')
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [notesDraft, setNotesDraft] = useState('')
 
   useEffect(() => {
     fetchIncidents()
   }, [])
 
+  useEffect(() => {
+    if (selectedIncident) {
+      setNotesDraft(selectedIncident.analyst_notes || '')
+    }
+  }, [selectedIncident])
+
   const fetchIncidents = async () => {
     const res = await axios.get(`${API_BASE}/incidents`)
     setIncidents(res.data)
+
+    if (selectedIncident) {
+      const refreshed = res.data.find((item: Incident) => item.id === selectedIncident.id)
+      if (refreshed) {
+        setSelectedIncident(refreshed)
+      }
+    }
   }
 
-  const scanReddit = async () => {
+  const scanSource = async (source: 'reddit' | 'regulatory' | 'x') => {
     setLoading(true)
-    await axios.post(`${API_BASE}/scan/reddit`)
+    await axios.post(`${API_BASE}/scan/${source}`)
     await fetchIncidents()
     setLoading(false)
   }
 
-  const updateStatus = async (id: number, status: string) => {
-    await axios.patch(`${API_BASE}/incidents/${id}`, { status })
+  const scanAll = async () => {
+    setLoading(true)
+    await axios.post(`${API_BASE}/scan/reddit`)
+    await axios.post(`${API_BASE}/scan/regulatory`)
+    await axios.post(`${API_BASE}/scan/x`)
     await fetchIncidents()
+    setLoading(false)
+  }
+
+  const updateIncident = async (
+    id: number,
+    status: string,
+    analystNotes?: string
+  ) => {
+    await axios.patch(`${API_BASE}/incidents/${id}`, {
+      status,
+      analyst_notes: analystNotes,
+    })
+    await fetchIncidents()
+  }
+
+  const updateStatus = async (id: number, status: string) => {
+    await updateIncident(id, status)
+  }
+
+  const saveNotes = async () => {
+    if (!selectedIncident) return
+    await updateIncident(selectedIncident.id, selectedIncident.status, notesDraft)
   }
 
   const escalate = async (id: number) => {
@@ -76,6 +118,7 @@ export default function Home() {
         return category.includes('fraud') || category.includes('scam')
       }
       if (activeFilter === 'Jailbreak') return category.includes('jailbreak')
+      if (activeFilter === 'X') return incident.source === 'x'
 
       return true
     })
@@ -89,7 +132,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-50 p-8">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="mb-2 text-sm font-medium text-slate-500">
@@ -105,13 +148,39 @@ export default function Home() {
             </p>
           </div>
 
-          <button
-            onClick={scanReddit}
-            disabled={loading}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-white shadow-sm disabled:opacity-50"
-          >
-            {loading ? 'Scanning...' : 'Scan Reddit'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => scanSource('reddit')}
+              disabled={loading}
+              className="rounded-xl bg-slate-900 px-4 py-2 text-white shadow-sm disabled:opacity-50"
+            >
+              {loading ? 'Scanning...' : 'Scan Reddit'}
+            </button>
+
+            <button
+              onClick={() => scanSource('regulatory')}
+              disabled={loading}
+              className="rounded-xl border bg-white px-4 py-2 text-slate-800 shadow-sm disabled:opacity-50"
+            >
+              Scan Regulatory
+            </button>
+
+            <button
+              onClick={() => scanSource('x')}
+              disabled={loading}
+              className="rounded-xl border bg-white px-4 py-2 text-slate-800 shadow-sm disabled:opacity-50"
+            >
+              Scan X
+            </button>
+
+            <button
+              onClick={scanAll}
+              disabled={loading}
+              className="rounded-xl border border-slate-900 bg-slate-100 px-4 py-2 text-slate-900 shadow-sm disabled:opacity-50"
+            >
+              Scan All
+            </button>
+          </div>
         </div>
 
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -137,90 +206,203 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="mb-4 text-sm text-slate-500">
-          Showing {filteredIncidents.length} of {incidents.length} incidents
-        </div>
+        <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+          <section>
+            <div className="mb-4 text-sm text-slate-500">
+              Showing {filteredIncidents.length} of {incidents.length} incidents
+            </div>
 
-        <div className="space-y-4">
-          {filteredIncidents.map((incident) => (
-            <div
-              key={incident.id}
-              className="rounded-2xl border bg-white p-5 shadow-sm"
-            >
-              <div className="mb-3 flex items-start justify-between gap-4">
-                <div>
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    <span className="rounded-full border px-2 py-1 text-xs text-slate-600">
-                      r/{incident.source_community}
-                    </span>
-                    <span className="rounded-full border px-2 py-1 text-xs text-slate-600">
-                      {incident.category}
-                    </span>
-                    <span className="rounded-full border px-2 py-1 text-xs text-slate-600">
-                      {incident.status}
+            <div className="space-y-4">
+              {filteredIncidents.map((incident) => (
+                <div
+                  key={incident.id}
+                  onClick={() => setSelectedIncident(incident)}
+                  className={`cursor-pointer rounded-2xl border bg-white p-5 shadow-sm transition hover:border-slate-400 ${
+                    selectedIncident?.id === incident.id ? 'border-slate-900' : ''
+                  }`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        <span className="rounded-full border px-2 py-1 text-xs text-slate-600">
+                          r/{incident.source_community}
+                        </span>
+                        <span className="rounded-full border px-2 py-1 text-xs text-slate-600">
+                          {incident.category}
+                        </span>
+                        <span className="rounded-full border px-2 py-1 text-xs text-slate-600">
+                          {incident.status}
+                        </span>
+                      </div>
+
+                      <h2 className="text-lg font-semibold text-slate-900">
+                        {incident.title}
+                      </h2>
+                    </div>
+
+                    <span className={`rounded-full border px-3 py-1 text-sm font-medium ${severityClass(incident.severity)}`}>
+                      Severity {incident.severity}/10
                     </span>
                   </div>
 
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    {incident.title}
-                  </h2>
+                  <p className="mb-4 text-sm leading-6 text-slate-700">
+                    {incident.summary}
+                  </p>
+
+                  <div className="mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+                    <Info label="Confidence" value={`${Math.round(incident.confidence * 100)}%`} />
+                    <Info label="Review Team" value={incident.escalation_team} />
+                    <Info label="Review Recommended" value={incident.should_escalate ? 'Yes' : 'No'} />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        updateStatus(incident.id, 'triaged')
+                      }}
+                      className="rounded-lg border px-3 py-2 text-sm"
+                    >
+                      Mark Triaged
+                    </button>
+
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        escalate(incident.id)
+                      }}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      Escalate
+                    </button>
+
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        updateStatus(incident.id, 'closed')
+                      }}
+                      className="rounded-lg border px-3 py-2 text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {filteredIncidents.length === 0 && (
+                <div className="rounded-2xl border bg-white p-8 text-center text-slate-500">
+                  No incidents match this filter.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <aside className="h-fit rounded-2xl border bg-white p-5 shadow-sm lg:sticky lg:top-8">
+            {!selectedIncident ? (
+              <div className="py-10 text-center text-slate-500">
+                Select an incident to review details, evidence, and analyst notes.
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Incident Detail
+                    </p>
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      {selectedIncident.title}
+                    </h3>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedIncident(null)}
+                    className="rounded-lg border px-2 py-1 text-sm"
+                  >
+                    Close
+                  </button>
                 </div>
 
-                <span className={`rounded-full border px-3 py-1 text-sm font-medium ${severityClass(incident.severity)}`}>
-                  Severity {incident.severity}/10
-                </span>
-              </div>
+                <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
+                  <Info label="Status" value={selectedIncident.status} />
+                  <Info label="Category" value={selectedIncident.category} />
+                  <Info label="Severity" value={`${selectedIncident.severity}/10`} />
+                  <Info label="Confidence" value={`${Math.round(selectedIncident.confidence * 100)}%`} />
+                </div>
 
-              <p className="mb-4 text-sm leading-6 text-slate-700">
-                {incident.summary}
-              </p>
+                <div className="mb-4 rounded-xl bg-slate-50 p-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Analyst Summary
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    {selectedIncident.summary}
+                  </p>
+                </div>
 
-              <div className="mb-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
-                <Info label="Confidence" value={`${Math.round(incident.confidence * 100)}%`} />
-                <Info label="Recommended Review Team" value={incident.escalation_team} />
-                <Info label="Human Review Recommended" value={incident.should_escalate ? 'Yes' : 'No'} />
-              </div>
+                <div className="mb-4 rounded-xl bg-slate-50 p-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Source Content
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    {selectedIncident.raw_content || 'No body text available for this signal.'}
+                  </p>
+                </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => updateStatus(incident.id, 'triaged')}
-                  className="rounded-lg border px-3 py-2 text-sm"
-                >
-                  Mark Triaged
-                </button>
+                <div className="mb-4">
+                  <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Analyst Notes
+                  </label>
+                  <textarea
+                    value={notesDraft}
+                    onChange={(event) => setNotesDraft(event.target.value)}
+                    placeholder="Add investigation notes, context, reviewer judgment, or follow-up actions..."
+                    className="h-36 w-full rounded-xl border p-3 text-sm outline-none focus:border-slate-900"
+                  />
+                </div>
 
-                <button
-                  onClick={() => escalate(incident.id)}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white"
-                >
-                  Escalate
-                </button>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={saveNotes}
+                    className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white"
+                  >
+                    Save Notes
+                  </button>
 
-                <button
-                  onClick={() => updateStatus(incident.id, 'closed')}
-                  className="rounded-lg border px-3 py-2 text-sm"
-                >
-                  Close
-                </button>
-
-                {incident.source_url && (
-                  <a
-                    href={incident.source_url}
-                    target="_blank"
+                  <button
+                    onClick={() => updateIncident(selectedIncident.id, 'triaged', notesDraft)}
                     className="rounded-lg border px-3 py-2 text-sm"
                   >
-                    View Source
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
+                    Save & Triaged
+                  </button>
 
-          {filteredIncidents.length === 0 && (
-            <div className="rounded-2xl border bg-white p-8 text-center text-slate-500">
-              No incidents match this filter.
-            </div>
-          )}
+                  <button
+                    onClick={() => updateIncident(selectedIncident.id, 'closed', notesDraft)}
+                    className="rounded-lg border px-3 py-2 text-sm"
+                  >
+                    Save & Close
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => escalate(selectedIncident.id)}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                  >
+                    Escalate for Review
+                  </button>
+
+                  {selectedIncident.source_url && (
+                    <a
+                      href={selectedIncident.source_url}
+                      target="_blank"
+                      className="rounded-lg border px-3 py-2 text-sm"
+                    >
+                      View Source
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </aside>
         </div>
       </div>
     </main>
@@ -240,7 +422,7 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-slate-50 p-3">
       <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-800">{value}</p>
+      <p className="mt-1 break-words font-medium text-slate-800">{value}</p>
     </div>
   )
 }
