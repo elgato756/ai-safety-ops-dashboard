@@ -1,31 +1,28 @@
-# AI Risk Intelligence Platform
+# AI Safety Ops Dashboard
 
-A human-in-the-loop Trust & Safety risk intelligence prototype designed to aggregate emerging signals, support triage, and recommend review paths.
+A human-in-the-loop Trust & Safety operations prototype for identifying, triaging, and escalating emerging AI misuse, platform integrity, and regulatory risk signals.
 
-This project does **not** make automated enforcement, legal, account-level, or policy decisions. It is an analyst-assist system intended to help operations teams identify, organize, prioritize, and escalate risk signals for human review.
+This project demonstrates how OpenAI technology can support operational risk intelligence workflows without replacing human analysts. The system aggregates signals from source monitors, classifies potential risk areas, recommends review paths, supports analyst notes, and maintains an audit trail of actions.
 
-## Why this project matters
+## Why This Matters
 
-Trust & Safety teams working on AI products need to identify new and complex safety, policy, and integrity challenges in a rapidly evolving landscape. This prototype demonstrates how OpenAI-powered workflows can help analysts:
+Trust & Safety teams need to identify emerging risks quickly across messy external environments: social platforms, forums, regulatory sources, policy updates, and security research. This prototype shows how AI can reduce detection latency and help analysts prioritize high-signal incidents while preserving human review, auditability, and source verification.
 
-- Aggregate public risk signals
-- Classify possible safety, integrity, regulatory, and reputational risks
-- Estimate severity and confidence
-- Preserve analyst judgment through human-in-the-loop review
-- Route incidents to appropriate review teams
-- Maintain an auditable incident lifecycle
+## Core Capabilities
 
-## MVP features
-
-- Reddit signal ingestion
+- Multi-source signal ingestion
+- Reddit/X-style social risk monitoring with demo fallbacks
+- Official regulatory/policy source monitoring
+- NIST AI RMF and EU AI Act source references
 - AI-assisted risk classification
 - Severity and confidence scoring
-- Persistent incident database using SQLite
-- Incident lifecycle statuses
+- Human-in-the-loop analyst review
 - Analyst notes
-- Optional Slack webhook escalation
-- Next.js dashboard
-- FastAPI backend
+- Incident lifecycle management
+- Escalation workflow simulation
+- Audit trail logging
+- Source verification metadata
+- Demo seed/reset endpoints
 
 ## Architecture
 
@@ -165,4 +162,32 @@ The system does not make final enforcement, account-level, policy, or legal deci
 - escalation workflow simulation
 - dashboard filtering by risk type and status
 - local SQLite persistence
+
+
+---
+
+## Demo Script
+
+A suggested demo flow:
+
+1. Start the backend and frontend.
+2. Open the dashboard at `http://localhost:3000`.
+3. Click **Scan Regulatory** to ingest official policy-source monitoring signals.
+4. Click **Scan Reddit** or **Scan X** to ingest social risk signals or demo fallbacks.
+5. Select an incident card.
+6. Review:
+   - source
+   - category
+   - severity
+   - confidence
+   - analyst summary
+   - source content
+   - verification status
+7. Add analyst notes.
+8. Mark the incident as triaged or escalated.
+9. Review the audit trail to show traceability.
+
+Key message:
+
+> The system does not make enforcement or legal decisions. It assists human analysts by aggregating signals, structuring evidence, recommending review paths, and preserving an audit trail.
 
