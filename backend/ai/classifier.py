@@ -4,10 +4,25 @@ from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+class RiskAnalysis(BaseModel):
+    is_relevant: bool = True
+    category: str = "unknown"
+    severity: int = Field(default=1, ge=1, le=10)
+    confidence: float = Field(default=0.5, ge=0, le=1)
+    evidence: list[str] = []
+    missing_context: list[str] = []
+    human_review_recommended: bool = True
+    recommended_review_team: str = "trust_and_safety_triage"
+    analyst_summary: str = ""
+    suggested_next_steps: list[str] = []
+
 
 SYSTEM_PROMPT = """
 You are an AI-assisted risk intelligence system supporting a Trust & Safety operations team.
@@ -32,7 +47,7 @@ Determine:
 9. A concise analyst-facing summary
 10. Suggested next steps for investigation or monitoring
 
-Return JSON with exactly these keys:
+Return JSON with:
 - is_relevant
 - category
 - severity
@@ -46,37 +61,65 @@ Return JSON with exactly these keys:
 """
 
 
-def _fallback_result(error_message: str) -> dict[str, Any]:
-    return {
-        "is_relevant": False,
-        "category": "classification_error",
-        "severity": 0,
-        "confidence": 0.0,
-        "evidence": "Classifier failed before analysis completed.",
-        "missing_context": error_message,
-        "human_review_recommended": False,
-        "recommended_review_team": "triage",
-        "analyst_summary": "Classification could not be completed.",
-        "suggested_next_steps": "Check API configuration and retry the scan.",
-    }
+def _safe_int(value: Any, default: int = 1) -> int:
+    try:
+        parsed = int(value)
+        return max(1, min(10, parsed))
+    except Exception:
+        return default
 
 
-def classify_content(title: str, body: str) -> dict[str, Any]:
-    if not os.getenv("OPENAI_API_KEY"):
-        return _fallback_result("Missing OPENAI_API_KEY in backend/.env.")
+def _safe_float(value: Any, default: float = 0.5) -> float:
+    try:
+        parsed = float(value)
+        return max(0, min(1, parsed))
+    except Exception:
+        return default
 
-    content = f"TITLE: {title}\n\nBODY:\n{body or '[No body text provided]'}"
+
+def _safe_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, str) and value.strip():
+        return [value]
+    return []
+
+
+def classify_content(title: str, body: str):
+    content = f"TITLE: {title}\n\nBODY:\n{body}"
+
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ],
+        response_format={"type": "json_object"},
+    )
+
+    raw_text = response.choices[0].message.content or "{}"
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": content},
-            ],
-            response_format={"type": "json_object"},
-        )
-        raw = response.choices[0].message.content or "{}"
-        return json.loads(raw)
-    except Exception as exc:  # Keep MVP resilient during demos.
-        return _fallback_result(str(exc))
+        raw = json.loads(raw_text)
+    except Exception:
+        raw = {}
+
+    analysis = RiskAnalysis(
+        is_relevant=bool(raw.get("is_relevant", True)),
+        category=str(raw.get("category", "unknown")),
+        severity=_safe_int(raw.get("severity", 1)),
+        confidence=_safe_float(raw.get("confidence", 0.5)),
+        evidence=_safe_list(raw.get("evidence", [])),
+        missing_context=_safe_list(raw.get("missing_context", [])),
+        human_review_recommended=bool(raw.get("human_review_recommended", True)),
+        recommended_review_team=str(
+            raw.get("recommended_review_team", raw.get("escalation_team", "trust_and_safety_triage"))
+        ),
+        analyst_summary=str(
+            raw.get("analyst_summary", raw.get("summary", "Potential risk signal requiring analyst review."))
+        ),
+        suggested_next_steps=_safe_list(raw.get("suggested_next_steps", [])),
+    )
+
+    # Return a JSON string to preserve compatibility with the existing incident service.
+    return json.dumps(analysis.dict())

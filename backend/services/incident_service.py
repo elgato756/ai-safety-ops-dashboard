@@ -1,5 +1,5 @@
+import json
 from datetime import datetime
-from typing import Any, Optional
 
 from sqlmodel import Session, select
 
@@ -14,39 +14,47 @@ def incident_exists(session: Session, source: str, source_id: str) -> bool:
     return session.exec(statement).first() is not None
 
 
-def _normalize_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "is_relevant": bool(analysis.get("is_relevant", True)),
-        "category": str(analysis.get("category", "unknown")),
-        "severity": max(0, min(10, int(analysis.get("severity", 0) or 0))),
-        "confidence": max(0.0, min(1.0, float(analysis.get("confidence", 0.0) or 0.0))),
-        "evidence": str(analysis.get("evidence", "")),
-        "missing_context": str(analysis.get("missing_context", "")),
-        "human_review_recommended": bool(analysis.get("human_review_recommended", False)),
-        "recommended_review_team": str(analysis.get("recommended_review_team", "triage")),
-        "analyst_summary": str(analysis.get("analyst_summary", "")),
-        "suggested_next_steps": str(analysis.get("suggested_next_steps", "")),
-    }
+def _parse_analysis(analysis: str | dict):
+    if isinstance(analysis, dict):
+        return analysis
+
+    try:
+        return json.loads(analysis)
+    except Exception:
+        return {}
 
 
-def create_incident_from_reddit_post(
-    session: Session,
-    post: dict[str, Any],
-    analysis: dict[str, Any],
-) -> Optional[Incident]:
-    if incident_exists(session, "reddit", post["id"]):
+def create_incident_from_signal(session: Session, signal: dict, analysis: str | dict):
+    parsed = _parse_analysis(analysis)
+
+    source = signal.get("source", "reddit")
+    source_id = signal.get("id")
+
+    if not source_id:
         return None
 
-    parsed = _normalize_analysis(analysis)
+    if incident_exists(session, source, source_id):
+        return None
 
     incident = Incident(
-        source="reddit",
-        source_id=post["id"],
-        source_url=post.get("url"),
-        source_community=post.get("subreddit"),
-        title=post["title"],
-        raw_content=post.get("body"),
-        **parsed,
+        source=source,
+        source_id=source_id,
+        source_url=signal.get("url"),
+        source_community=signal.get("subreddit") or signal.get("source_community"),
+        title=signal.get("title", "Untitled signal"),
+        raw_content=signal.get("body", ""),
+        category=parsed.get("category", "unknown"),
+        severity=int(parsed.get("severity", 1)),
+        confidence=float(parsed.get("confidence", 0.5)),
+        summary=parsed.get("analyst_summary") or parsed.get("summary", ""),
+        escalation_team=(
+            parsed.get("recommended_review_team")
+            or parsed.get("escalation_team")
+            or "trust_and_safety_triage"
+        ),
+        should_escalate=bool(
+            parsed.get("human_review_recommended", parsed.get("should_escalate", True))
+        ),
     )
 
     session.add(incident)
@@ -56,17 +64,22 @@ def create_incident_from_reddit_post(
     return incident
 
 
-def list_incidents(session: Session) -> list[Incident]:
+def create_incident_from_reddit_post(session: Session, post: dict, analysis: str | dict):
+    post = {**post, "source": "reddit"}
+    return create_incident_from_signal(session, post, analysis)
+
+
+def list_incidents(session: Session):
     statement = select(Incident).order_by(Incident.created_at.desc())
-    return list(session.exec(statement).all())
+    return session.exec(statement).all()
 
 
 def update_incident_status(
     session: Session,
     incident_id: int,
     status: str,
-    analyst_notes: Optional[str] = None,
-) -> Optional[Incident]:
+    analyst_notes: str | None = None,
+):
     incident = session.get(Incident, incident_id)
 
     if not incident:
