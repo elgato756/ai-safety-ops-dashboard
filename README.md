@@ -191,6 +191,22 @@ Key message:
 
 > The system does not make enforcement or legal decisions. It assists human analysts by aggregating signals, structuring evidence, recommending review paths, and preserving an audit trail.
 
+---
+
+## API Configuration
+
+This project supports external APIs, but the app is designed to remain demoable even when third-party APIs are unavailable, rate-limited, paid, or blocked.
+
+Only the OpenAI API is needed for real AI-assisted classification. Reddit, X/Twitter, and Slack are optional.
+
+### Environment Variables
+
+Create a local backend environment file:
+
+```bash
+cd backend
+cp .env.example .env
+nano .env
 
 ---
 
