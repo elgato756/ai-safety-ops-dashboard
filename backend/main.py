@@ -13,6 +13,7 @@ from ingestion.regulatory_ingest import fetch_regulatory_signals
 from ingestion.x_ingest import fetch_x_signals
 from models.audit_log import AuditLog
 from models.incident import Incident
+from services.demo_seed_service import seed_demo_incidents
 from services.audit_service import (
     create_audit_event,
     list_audit_events,
@@ -296,6 +297,33 @@ def escalate_incident(
     return {
         "incident": incident,
         "slack": result,
+    }
+
+
+
+@app.post("/demo/seed")
+def seed_demo_data(session: Session = Depends(get_session)):
+    created = seed_demo_incidents(session)
+
+    return {
+        "created": len(created),
+        "incidents": created,
+    }
+
+
+@app.post("/demo/reset")
+def reset_demo_data(session: Session = Depends(get_session)):
+    # Delete child audit rows first, then incidents.
+    from sqlmodel import delete
+    from models.audit_log import AuditLog
+
+    session.exec(delete(AuditLog))
+    session.exec(delete(Incident))
+    session.commit()
+
+    return {
+        "status": "reset_complete",
+        "message": "All local incidents and audit events were deleted.",
     }
 
 

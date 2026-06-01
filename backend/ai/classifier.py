@@ -13,8 +13,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class RiskAnalysis(BaseModel):
     is_relevant: bool = True
-    category: str = "unknown"
-    severity: int = Field(default=1, ge=1, le=10)
+    category: str = "needs_review"
+    severity: int = Field(default=5, ge=1, le=10)
     confidence: float = Field(default=0.5, ge=0, le=1)
     evidence: list[str] = []
     missing_context: list[str] = []
@@ -40,27 +40,6 @@ For regulatory analysis:
 - Distinguish confirmed official-source information from items requiring legal or policy verification.
 - Recommend human legal/policy review before any operational compliance decision.
 
-For regulatory analysis:
-- Treat official government, regulator, standards-body, or legislative sources as the highest-confidence source type.
-- Treat news, social media, blogs, commentary, or unclear sources only as monitoring leads.
-- Do not invent legal obligations.
-- Distinguish confirmed official-source information from items requiring legal or policy verification.
-- Recommend human legal/policy review before any operational compliance decision.
-
-Analyze the following content as a potential risk signal.
-
-Determine:
-1. Whether the content is relevant to AI safety, platform integrity, policy, abuse, or regulatory risk
-2. The likely risk category
-3. A severity estimate from 1-10
-4. A confidence score from 0-1
-5. What evidence supports the classification
-6. What important context may be missing
-7. Whether human review is recommended
-8. Which team should review it, if any
-9. A concise analyst-facing summary
-10. Suggested next steps for investigation or monitoring
-
 Return JSON with:
 - is_relevant
 - category
@@ -75,7 +54,7 @@ Return JSON with:
 """
 
 
-def _safe_int(value: Any, default: int = 1) -> int:
+def _safe_int(value: Any, default: int = 5) -> int:
     try:
         parsed = int(value)
         return max(1, min(10, parsed))
@@ -99,41 +78,77 @@ def _safe_list(value: Any) -> list[str]:
     return []
 
 
+def fallback_analysis(reason: str) -> str:
+    fallback = RiskAnalysis(
+        is_relevant=True,
+        category="needs_review",
+        severity=5,
+        confidence=0.5,
+        evidence=[
+            "Signal was ingested successfully.",
+            "Classifier fallback was used because AI classification could not complete.",
+        ],
+        missing_context=[
+            reason,
+            "Human review is required before any operational decision.",
+        ],
+        human_review_recommended=True,
+        recommended_review_team="trust_and_safety_triage",
+        analyst_summary=(
+            "This signal was ingested successfully, but AI classification could not be completed. "
+            "A human analyst should review the source content and backend configuration."
+        ),
+        suggested_next_steps=[
+            "Review the raw source content manually.",
+            "Check OPENAI_API_KEY and available API quota.",
+            "Confirm whether this signal should be escalated.",
+        ],
+    )
+
+    return json.dumps(fallback.dict())
+
+
 def classify_content(title: str, body: str):
     content = f"TITLE: {title}\n\nBODY:\n{body}"
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": content},
-        ],
-        response_format={"type": "json_object"},
-    )
-
-    raw_text = response.choices[0].message.content or "{}"
+    if not os.getenv("OPENAI_API_KEY"):
+        return fallback_analysis("OPENAI_API_KEY is missing from backend/.env.")
 
     try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": content},
+            ],
+            response_format={"type": "json_object"},
+        )
+
+        raw_text = response.choices[0].message.content or "{}"
         raw = json.loads(raw_text)
-    except Exception:
-        raw = {}
 
-    analysis = RiskAnalysis(
-        is_relevant=bool(raw.get("is_relevant", True)),
-        category=str(raw.get("category", "unknown")),
-        severity=_safe_int(raw.get("severity", 1)),
-        confidence=_safe_float(raw.get("confidence", 0.5)),
-        evidence=_safe_list(raw.get("evidence", [])),
-        missing_context=_safe_list(raw.get("missing_context", [])),
-        human_review_recommended=bool(raw.get("human_review_recommended", True)),
-        recommended_review_team=str(
-            raw.get("recommended_review_team", raw.get("escalation_team", "trust_and_safety_triage"))
-        ),
-        analyst_summary=str(
-            raw.get("analyst_summary", raw.get("summary", "Potential risk signal requiring analyst review."))
-        ),
-        suggested_next_steps=_safe_list(raw.get("suggested_next_steps", [])),
-    )
+        analysis = RiskAnalysis(
+            is_relevant=bool(raw.get("is_relevant", True)),
+            category=str(raw.get("category", "needs_review")),
+            severity=_safe_int(raw.get("severity", 5)),
+            confidence=_safe_float(raw.get("confidence", 0.5)),
+            evidence=_safe_list(raw.get("evidence", [])),
+            missing_context=_safe_list(raw.get("missing_context", [])),
+            human_review_recommended=bool(raw.get("human_review_recommended", True)),
+            recommended_review_team=str(
+                raw.get("recommended_review_team", "trust_and_safety_triage")
+            ),
+            analyst_summary=str(
+                raw.get(
+                    "analyst_summary",
+                    "Potential risk signal requiring analyst review.",
+                )
+            ),
+            suggested_next_steps=_safe_list(raw.get("suggested_next_steps", [])),
+        )
 
-    # Return a JSON string to preserve compatibility with the existing incident service.
-    return json.dumps(analysis.dict())
+        return json.dumps(analysis.dict())
+
+    except Exception as error:
+        print(f"OpenAI classification failed. Using fallback analysis: {error}")
+        return fallback_analysis(str(error))

@@ -22,16 +22,12 @@ class Incident(SQLModel, table=True):
     title: str
     raw_content: Optional[str] = None
 
-    is_relevant: bool = True
-    category: str = "unknown"
-    severity: int = 0
-    confidence: float = 0.0
-    evidence: Optional[str] = None
-    missing_context: Optional[str] = None
-    analyst_summary: str = ""
-    suggested_next_steps: Optional[str] = None
-    recommended_review_team: str = "triage"
-    human_review_recommended: bool = False
+    category: str
+    severity: int
+    confidence: float
+    summary: str
+    escalation_team: str
+    should_escalate: bool = False
 
     status: str = "open"
     analyst_notes: Optional[str] = None

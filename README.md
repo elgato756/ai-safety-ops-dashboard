@@ -191,3 +191,20 @@ Key message:
 
 > The system does not make enforcement or legal decisions. It assists human analysts by aggregating signals, structuring evidence, recommending review paths, and preserving an audit trail.
 
+
+---
+
+## Screenshots
+
+### Main Dashboard
+
+![Main dashboard](docs/screenshots/dashboard.png)
+
+### Incident Detail Panel
+
+![Incident detail panel](docs/screenshots/incident-detail.png)
+
+### Audit Trail
+
+![Audit trail](docs/screenshots/audit-trail.png)
+
