@@ -445,3 +445,20 @@ It does:
 
 The intended value is not automated enforcement. The intended value is helping analysts identify, triage, and route high-signal issues more efficiently.
 
+
+---
+
+## Screenshots
+
+### Main Dashboard
+
+![Main dashboard](docs/screenshots/dashboard.png)
+
+### Incident Detail Panel
+
+![Incident detail panel](docs/screenshots/incident-detail.png)
+
+### Audit Trail
+
+![Audit trail](docs/screenshots/audit-trail.png)
+
