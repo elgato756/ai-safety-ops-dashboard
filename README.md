@@ -1,36 +1,98 @@
-# AI Risk Intelligence Platform
+# AI Safety Ops Dashboard
 
-A human-in-the-loop Trust & Safety risk intelligence prototype designed to aggregate emerging signals, support triage, and recommend review paths.
+A human-in-the-loop Trust & Safety risk intelligence dashboard for monitoring external AI risk signals, supporting analyst triage, escalating high-severity incidents, and preserving audit trails.
 
-This project does **not** make automated enforcement, legal, account-level, or policy decisions. It is an analyst-assist system intended to help operations teams identify, organize, prioritize, and escalate risk signals for human review.
+This project does **not** make automated enforcement, legal, account-level, or policy decisions. It is an analyst-assist prototype intended to help operations teams identify, organize, prioritize, and escalate risk signals for human review.
 
-## Why this project matters
+---
 
-Trust & Safety teams working on AI products need to identify new and complex safety, policy, and integrity challenges in a rapidly evolving landscape. This prototype demonstrates how OpenAI-powered workflows can help analysts:
+## Why This Project Matters
 
-- Aggregate public risk signals
-- Classify possible safety, integrity, regulatory, and reputational risks
-- Estimate severity and confidence
-- Preserve analyst judgment through human-in-the-loop review
-- Route incidents to appropriate review teams
-- Maintain an auditable incident lifecycle
+Trust & Safety teams working on AI products need to identify new and complex safety, policy, abuse, fraud, and integrity risks quickly. External signals are messy, API access can be unreliable, and operational decisions often require careful human judgment.
 
-## MVP features
+This project demonstrates a practical risk-intelligence workflow for AI platforms. It combines external signal monitoring, AI-assisted triage, analyst review, escalation, regulatory source tracking, and audit logging into one operational dashboard.
 
-- Reddit signal ingestion
-- AI-assisted risk classification
+The goal is not automated enforcement. The goal is to help analysts reduce detection latency, structure messy external signals, and make better escalation decisions while preserving human review.
+
+---
+
+## Role Alignment
+
+This project is designed to map to Trust & Safety, Risk Operations, Safety Systems, and abuse-response workflows.
+
+It demonstrates experience with:
+
+- emerging abuse and misuse signal detection
+- fraud, scam, phishing, jailbreak, and deepfake risk triage
+- regulatory and policy source monitoring
+- human-in-the-loop review workflows
+- severity and confidence scoring
+- escalation pathways
+- analyst notes and audit trails
+- graceful degradation when external systems fail
+- cross-functional handoff patterns for Legal, Policy, Security, Fraud, and Trust & Safety teams
+
+---
+
+## Core Features
+
+- Reddit signal ingestion with demo fallback behavior
+- X / Twitter public signal monitoring with demo fallback behavior
+- Regulatory and policy source monitoring
+- AI-assisted risk classification using the OpenAI API
+- Safe fallback classification when model access is unavailable
 - Severity and confidence scoring
-- Persistent incident database using SQLite
-- Incident lifecycle statuses
-- Analyst notes
-- Optional Slack webhook escalation
-- Next.js dashboard
+- Recommended review team selection
+- Analyst notes and incident lifecycle updates
+- Escalation workflow with optional Slack webhook support
+- Persistent local incident database using SQLite
+- Audit trails for analyst actions and escalations
+- Next.js dashboard frontend
 - FastAPI backend
+
+---
+
+## Screenshots
+
+### Main Dashboard
+
+![Main dashboard](docs/screenshots/dashboard.png)
+
+### Incident Detail Panel
+
+![Incident detail panel](docs/screenshots/incident-detail.png)
+
+### Audit Trail
+
+![Audit trail](docs/screenshots/audit-trail.png)
+
+---
+
+## Demo Video
+
+A short demo video can be added here after recording:
+
+```text
+Demo video link: add Loom, YouTube, or GitHub video link here
+```
+
+Recommended demo flow:
+
+1. Start the backend and frontend.
+2. Seed demo incidents.
+3. Scan Reddit, X, or regulatory sources.
+4. Open an incident detail panel.
+5. Review AI summary, severity, confidence, and recommended review path.
+6. Add analyst notes.
+7. Escalate the incident.
+8. Show the audit trail.
+
+---
 
 ## Architecture
 
 ```text
-ai-risk-intelligence-platform/
+ai-safety-ops-dashboard/
 ├── backend/
 │   ├── main.py
 │   ├── ai/
@@ -38,10 +100,13 @@ ai-risk-intelligence-platform/
 │   ├── db/
 │   │   └── database.py
 │   ├── ingestion/
-│   │   └── reddit_ingest.py
+│   │   ├── reddit_ingest.py
+│   │   ├── x_ingest.py
+│   │   └── regulatory_ingest.py
 │   ├── models/
 │   │   └── incident.py
 │   ├── services/
+│   │   ├── demo_seed_service.py
 │   │   ├── incident_service.py
 │   │   └── slack_service.py
 │   ├── requirements.txt
@@ -58,28 +123,66 @@ ai-risk-intelligence-platform/
 │   └── next.config.js
 │
 ├── docs/
-│   └── product_brief.md
+│   ├── demo_runbook.md
+│   ├── portfolio_positioning.md
+│   └── screenshots/
 ├── .gitignore
 └── README.md
 ```
 
-## Backend setup
+---
+
+## Quick Demo Flow
+
+Start the backend:
 
 ```bash
 cd backend
-python -m venv venv
+source venv/bin/activate
+uvicorn main:app --reload
+```
+
+Start the frontend in a second terminal:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Seed demo incidents:
+
+```bash
+curl -X POST http://localhost:8000/demo/seed
+```
+
+Reset demo data:
+
+```bash
+curl -X POST http://localhost:8000/demo/reset
+```
+
+Open the dashboard:
+
+```text
+http://localhost:3000
+```
+
+Open the backend API docs:
+
+```text
+http://localhost:8000/docs
+```
+
+---
+
+## Backend Setup
+
+```bash
+cd backend
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-```
-
-Add your API keys to `.env`:
-
-```text
-OPENAI_API_KEY=your_openai_api_key
-REDDIT_CLIENT_ID=your_reddit_client_id
-REDDIT_CLIENT_SECRET=your_reddit_client_secret
-SLACK_WEBHOOK_URL=optional_slack_webhook_url
 ```
 
 Run the backend:
@@ -88,13 +191,9 @@ Run the backend:
 uvicorn main:app --reload
 ```
 
-Open the API docs:
+---
 
-```text
-http://localhost:8000/docs
-```
-
-## Frontend setup
+## Frontend Setup
 
 ```bash
 cd frontend
@@ -107,40 +206,6 @@ Open:
 ```text
 http://localhost:3000
 ```
-
-## Suggested demo flow
-
-1. Start the backend.
-2. Start the frontend.
-3. Click **Scan Reddit**.
-4. Review generated incidents.
-5. Mark one as triaged.
-6. Escalate a high-severity incident.
-7. Explain that the model assists analysts but does not make final decisions.
-
-## Risk taxonomy
-
-Current prototype categories include:
-
-- jailbreak sharing
-- prompt injection
-- fraud or scam enablement
-- coordinated abuse
-- synthetic identity abuse
-- malware or social engineering assistance
-- regulatory risk
-- reputational risk
-- unknown or low relevance
-
-## Portfolio positioning
-
-Suggested framing:
-
-> AI-assisted operational risk intelligence for emerging misuse and regulatory exposure. The system reduces detection latency and helps analysts focus on high-signal incidents while preserving human judgment for final review.
-
-## Responsible use disclaimer
-
-This prototype analyzes public content for demonstration purposes only. It should not be used to accuse individuals or groups of wrongdoing, make enforcement decisions, or conduct surveillance. Any production version would require privacy review, legal review, platform ToS review, robust audit logging, and human oversight.
 
 ---
 
@@ -403,7 +468,25 @@ This simulates how an internal Trust & Safety operations team might define thres
 
 ---
 
-### Demo Resilience
+## Risk Taxonomy
+
+Current prototype categories include:
+
+- jailbreak sharing
+- prompt injection
+- fraud or scam enablement
+- coordinated abuse
+- synthetic identity abuse
+- malware or social engineering assistance
+- deepfake impersonation
+- privacy or data exposure
+- regulatory risk
+- reputational risk
+- unknown or low relevance
+
+---
+
+## Demo Resilience
 
 The system is intentionally designed to degrade gracefully.
 
@@ -421,7 +504,7 @@ The fallback behavior is part of the product design, not just a workaround. In o
 
 ---
 
-### Human-in-the-Loop Positioning
+## Human-in-the-Loop Positioning
 
 This project is an analyst-assist prototype.
 
@@ -445,20 +528,95 @@ It does:
 
 The intended value is not automated enforcement. The intended value is helping analysts identify, triage, and route high-signal issues more efficiently.
 
+---
+
+## Limitations and Future Work
+
+Current limitations:
+
+- SQLite is used for local demo persistence.
+- Reddit and X integrations may use fallback demo signals when public API access is blocked, unavailable, or paid.
+- AI classification is assistive and requires human review.
+- Regulatory outputs are review signals, not legal advice.
+- The prototype does not include authentication or role-based access control.
+- Demo seed data is synthetic and is not intended to represent real incidents.
+
+Future improvements:
+
+- migrate from SQLite to Postgres
+- add user authentication and role-based permissions
+- add richer source credibility scoring
+- add duplicate incident clustering
+- add SLA timers and queue ownership
+- add exportable incident reports
+- add production observability and metrics
+- add policy taxonomy versioning
+- add reviewer assignment and queue views
+- add source deduplication and incident clustering
 
 ---
 
-## Screenshots
+## Reviewer Notes
 
-### Main Dashboard
+This project is intended as a portfolio prototype, not a production moderation system.
 
-![Main dashboard](docs/screenshots/dashboard.png)
+Key things to evaluate:
 
-### Incident Detail Panel
+- end-to-end workflow completeness
+- human-in-the-loop safety design
+- fallback behavior when APIs fail
+- auditability of analyst actions
+- source metadata and verification logic
+- clarity of escalation paths
+- practical relevance to Trust & Safety operations
 
-![Incident detail panel](docs/screenshots/incident-detail.png)
+---
 
-### Audit Trail
+## Portfolio Positioning
 
-![Audit trail](docs/screenshots/audit-trail.png)
+Suggested framing:
 
+> AI-assisted operational risk intelligence for emerging misuse and regulatory exposure. The system reduces detection latency and helps analysts focus on high-signal incidents while preserving human judgment for final review.
+
+Resume bullet:
+
+```text
+Built a human-in-the-loop AI Safety Ops dashboard that ingests external risk signals, classifies incidents with AI assistance, supports analyst notes and escalation workflows, and maintains audit trails for defensible Trust & Safety operations.
+```
+
+Expanded resume bullet:
+
+```text
+Designed and built a full-stack AI risk intelligence platform for Trust & Safety workflows, integrating OpenAI-assisted triage, Reddit/X signal monitoring, regulatory source tracking, severity scoring, escalation routing, analyst notes, and audit logging.
+```
+
+---
+
+## Suggested GitHub Repo Metadata
+
+Recommended repo description:
+
+```text
+Human-in-the-loop AI Safety Ops dashboard for external risk signal monitoring, AI-assisted triage, escalation workflows, regulatory source tracking, and audit trails.
+```
+
+Recommended topics:
+
+```text
+trust-safety
+ai-safety
+risk-intelligence
+fastapi
+nextjs
+openai-api
+moderation
+incident-response
+regulatory-monitoring
+human-in-the-loop
+```
+
+---
+
+## Responsible Use Disclaimer
+
+This prototype analyzes public content for demonstration purposes only. It should not be used to accuse individuals or groups of wrongdoing, make enforcement decisions, or conduct surveillance. Any production version would require privacy review, legal review, platform Terms of Service review, robust audit logging, and human oversight.
