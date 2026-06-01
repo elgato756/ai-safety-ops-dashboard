@@ -1,28 +1,31 @@
-# AI Safety Ops Dashboard
+# AI Risk Intelligence Platform
 
-A human-in-the-loop Trust & Safety operations prototype for identifying, triaging, and escalating emerging AI misuse, platform integrity, and regulatory risk signals.
+A human-in-the-loop Trust & Safety risk intelligence prototype designed to aggregate emerging signals, support triage, and recommend review paths.
 
-This project demonstrates how OpenAI technology can support operational risk intelligence workflows without replacing human analysts. The system aggregates signals from source monitors, classifies potential risk areas, recommends review paths, supports analyst notes, and maintains an audit trail of actions.
+This project does **not** make automated enforcement, legal, account-level, or policy decisions. It is an analyst-assist system intended to help operations teams identify, organize, prioritize, and escalate risk signals for human review.
 
-## Why This Matters
+## Why this project matters
 
-Trust & Safety teams need to identify emerging risks quickly across messy external environments: social platforms, forums, regulatory sources, policy updates, and security research. This prototype shows how AI can reduce detection latency and help analysts prioritize high-signal incidents while preserving human review, auditability, and source verification.
+Trust & Safety teams working on AI products need to identify new and complex safety, policy, and integrity challenges in a rapidly evolving landscape. This prototype demonstrates how OpenAI-powered workflows can help analysts:
 
-## Core Capabilities
+- Aggregate public risk signals
+- Classify possible safety, integrity, regulatory, and reputational risks
+- Estimate severity and confidence
+- Preserve analyst judgment through human-in-the-loop review
+- Route incidents to appropriate review teams
+- Maintain an auditable incident lifecycle
 
-- Multi-source signal ingestion
-- Reddit/X-style social risk monitoring with demo fallbacks
-- Official regulatory/policy source monitoring
-- NIST AI RMF and EU AI Act source references
+## MVP features
+
+- Reddit signal ingestion
 - AI-assisted risk classification
 - Severity and confidence scoring
-- Human-in-the-loop analyst review
+- Persistent incident database using SQLite
+- Incident lifecycle statuses
 - Analyst notes
-- Incident lifecycle management
-- Escalation workflow simulation
-- Audit trail logging
-- Source verification metadata
-- Demo seed/reset endpoints
+- Optional Slack webhook escalation
+- Next.js dashboard
+- FastAPI backend
 
 ## Architecture
 
@@ -139,65 +142,15 @@ Suggested framing:
 
 This prototype analyzes public content for demonstration purposes only. It should not be used to accuse individuals or groups of wrongdoing, make enforcement decisions, or conduct surveillance. Any production version would require privacy review, legal review, platform ToS review, robust audit logging, and human oversight.
 
-## Human-in-the-Loop Design
-
-This prototype is designed as an analyst-assist tool, not an automated enforcement system.
-
-The dashboard helps Trust & Safety teams:
-
-- aggregate emerging AI misuse and integrity signals
-- classify potential risks for review
-- prioritize incidents by severity and confidence
-- recommend appropriate review teams
-- support escalation workflows
-
-The system does not make final enforcement, account-level, policy, or legal decisions. Its purpose is to reduce detection latency and help human analysts focus on the highest-signal incidents.
-
-## Demo Features
-
-- Reddit signal ingestion with demo fallback data
-- AI-assisted risk classification
-- severity and confidence scoring
-- incident lifecycle states
-- escalation workflow simulation
-- dashboard filtering by risk type and status
-- local SQLite persistence
-
-
 ---
 
-## Demo Script
+## API and Integration Details
 
-A suggested demo flow:
+This project supports multiple external integrations, but it is intentionally designed to remain demoable even when third-party APIs are unavailable, rate-limited, paid, blocked, or missing credentials.
 
-1. Start the backend and frontend.
-2. Open the dashboard at `http://localhost:3000`.
-3. Click **Scan Regulatory** to ingest official policy-source monitoring signals.
-4. Click **Scan Reddit** or **Scan X** to ingest social risk signals or demo fallbacks.
-5. Select an incident card.
-6. Review:
-   - source
-   - category
-   - severity
-   - confidence
-   - analyst summary
-   - source content
-   - verification status
-7. Add analyst notes.
-8. Mark the incident as triaged or escalated.
-9. Review the audit trail to show traceability.
-
-Key message:
-
-> The system does not make enforcement or legal decisions. It assists human analysts by aggregating signals, structuring evidence, recommending review paths, and preserving an audit trail.
+The goal is to demonstrate the operational workflow: signal ingestion, risk classification, analyst review, escalation, and auditability. External APIs improve realism, but the demo does not depend on every external service working perfectly.
 
 ---
-
-## API Configuration
-
-This project supports external APIs, but the app is designed to remain demoable even when third-party APIs are unavailable, rate-limited, paid, or blocked.
-
-Only the OpenAI API is needed for real AI-assisted classification. Reddit, X/Twitter, and Slack are optional.
 
 ### Environment Variables
 
@@ -207,48 +160,288 @@ Create a local backend environment file:
 cd backend
 cp .env.example .env
 nano .env
+```
+
+Example `.env` file:
+
+```text
+OPENAI_API_KEY=sk-your-openai-api-key
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+SLACK_WEBHOOK_URL=
+X_BEARER_TOKEN=
+ESCALATION_SEVERITY_THRESHOLD=8
+```
+
+Never commit `.env` to GitHub. The `.env` file should stay local only.
 
 ---
 
-## Screenshots
+### OpenAI API
 
-### Main Dashboard
+The OpenAI API powers the AI-assisted analysis layer of the dashboard.
 
-![Main dashboard](docs/screenshots/dashboard.png)
+It is used for:
 
-### Incident Detail Panel
+- risk classification
+- analyst-facing summaries
+- severity scoring
+- confidence scoring
+- recommended review team selection
+- suggested next steps
+- structured incident analysis
 
-![Incident detail panel](docs/screenshots/incident-detail.png)
+Configure it in `backend/.env`:
 
-### Audit Trail
+```text
+OPENAI_API_KEY=sk-your-openai-api-key
+```
 
-![Audit trail](docs/screenshots/audit-trail.png)
+If the OpenAI API key is missing, invalid, or out of quota, the backend uses a safe fallback classification so the demo still works.
 
+Fallback behavior:
+
+```text
+category: needs_review
+severity: 5
+confidence: 0.5
+review team: trust_and_safety_triage
+```
+
+This fallback is intentional. In a real Trust & Safety environment, analyst workflows should not completely fail just because a model provider, API key, or quota configuration is temporarily unavailable. The system should degrade gracefully, preserve the incoming signal, and route it for human review.
 
 ---
 
-## API and Integration Configuration
+### Reddit API
 
-This project supports multiple external integrations. The app is intentionally designed to remain demoable even when third-party APIs are unavailable, rate-limited, paid, blocked, or missing credentials.
+Reddit is used as a social signal source for identifying emerging AI-related risk discussions.
 
-Only the OpenAI API is required for full AI-assisted classification. Reddit, X/Twitter, and Slack are optional.
+It can help monitor:
+
+- AI-related Reddit communities
+- emerging misuse discussions
+- jailbreak chatter
+- fraud or scam enablement discussions
+- public user concerns around AI behavior
+- early signals that may warrant Trust & Safety review
+
+Current behavior:
+
+- The backend attempts Reddit ingestion.
+- If Reddit blocks public access or returns an error, the backend uses demo fallback Reddit signals.
+- This keeps the dashboard demoable without requiring Reddit credentials.
+
+Optional configuration in `backend/.env`:
+
+```text
+REDDIT_CLIENT_ID=your-reddit-client-id
+REDDIT_CLIENT_SECRET=your-reddit-client-secret
+```
+
+To create Reddit API credentials:
+
+1. Go to Reddit app preferences.
+2. Create a new app.
+3. Choose `script`.
+4. Copy the client ID and client secret.
+5. Add them to `backend/.env`.
+
+The prototype currently works without Reddit credentials because fallback demo data is included. This is useful for demos because Reddit access can be inconsistent, blocked, or dependent on API configuration.
 
 ---
 
-## Environment Variables
+### X / Twitter API
 
-Create a local backend environment file:
+The X / Twitter API supports the public signal monitoring layer of the dashboard.
 
-```bash
-cd backend
-cp .env.example .env
-nano .env
+It is used for:
 
-## 3. Verify it was added
+- monitoring public AI risk chatter
+- identifying viral misuse signals
+- tracking reputational risk
+- surfacing jailbreak discussions
+- detecting AI scam, phishing, and impersonation reports
+- monitoring deepfake fraud discussion
+- tracking public conversation around AI regulation and policy developments
+- collecting early warning signals that may require Trust & Safety analyst review
 
-```bash
-grep -n "API and Integration Configuration" README.md
-grep -n "Reddit API" README.md
-grep -n "X / Twitter API" README.md
-grep -n "Slack Webhook" README.md
-grep -n "Demo Seed" README.md
+Configure it in `backend/.env`:
+
+```text
+X_BEARER_TOKEN=your-x-bearer-token
+```
+
+If `X_BEARER_TOKEN` is present, the backend attempts to use X recent search.
+
+If the X API token is missing, restricted, unpaid, rate-limited, or unavailable, the backend uses demo fallback X signals so the dashboard still works.
+
+Fallback behavior:
+
+```text
+source: x_demo_fallback
+category: needs_review
+signal type: public_ai_risk_chatter
+status: reviewable_demo_signal
+```
+
+This fallback is intentional. Public social APIs can be paid, restricted, unstable, or unavailable depending on account access and API plan. In a real Trust & Safety environment, a monitoring workflow should not fail completely because one external signal source is unavailable.
+
+Instead, the system should degrade gracefully, preserve the analyst workflow, and continue supporting triage, escalation, notes, and audit logging.
+
+X / Twitter is treated as a monitoring lead source, not a source of verified truth. Signals from X should be reviewed by a human analyst and, when necessary, verified against additional sources before operational action is taken.
+
+---
+
+### Slack Webhook
+
+Slack is used to simulate escalation into an internal response workflow.
+
+It can support:
+
+- high-severity incident alerts
+- routing to policy, legal, security, or fraud teams
+- operational response workflows
+- analyst-to-team handoff
+- incident visibility for stakeholders
+
+Optional configuration in `backend/.env`:
+
+```text
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Current behavior:
+
+- If `SLACK_WEBHOOK_URL` is present, escalation actions can send Slack alerts.
+- If it is blank, the app still works.
+- Escalation status and audit events are still recorded locally even without Slack.
+
+This makes the Slack integration optional while preserving the core workflow. The demo can still show that an incident was escalated, recorded, and added to the audit trail.
+
+---
+
+### Regulatory and Policy Sources
+
+The regulatory scanner monitors official policy-source references and turns them into reviewable policy signals.
+
+It is intended to help Trust & Safety, legal, and policy teams track developments from authoritative sources.
+
+Current official-source references include:
+
+- NIST AI Risk Management Framework
+- NIST AI RMF Core
+- European Commission AI Act implementation timeline
+- EUR-Lex official EU Artificial Intelligence Act legal reference
+
+The app stores regulatory metadata such as:
+
+- jurisdiction
+- authority
+- compliance area
+- source type
+- verification status
+- effective date when available
+
+The regulatory source system is designed around source hierarchy:
+
+1. Official government, regulator, standards-body, or legislative sources are treated as high-confidence references.
+2. Secondary sources, social media, blogs, or commentary should be treated only as monitoring leads.
+3. The system does not automatically convert regulatory text into binding compliance requirements.
+
+Regulatory outputs are intended for legal and policy review. The system does not provide legal advice, make compliance decisions, or automatically interpret law into operational obligations.
+
+---
+
+### Demo Seed and Reset Endpoints
+
+The backend includes demo endpoints so the dashboard can be populated quickly for presentations.
+
+Useful backend endpoints:
+
+```text
+POST /demo/seed
+POST /demo/reset
+```
+
+`POST /demo/seed` creates realistic test incidents across:
+
+- jailbreak sharing
+- AI phishing
+- deepfake fraud
+- prompt injection
+- privacy/data exposure
+- EU AI Act regulatory monitoring
+- FTC-style consumer protection risk
+
+`POST /demo/reset` clears local incidents and audit events.
+
+These endpoints are useful for portfolio demos because they let reviewers see the full workflow without depending on live external APIs.
+
+The seed data is not meant to represent real incidents. It is designed to demonstrate how the system handles different categories of risk, severity, confidence, escalation, analyst notes, and audit logging.
+
+---
+
+### Escalation Threshold
+
+The backend can recommend escalation when an incident reaches a configured severity threshold.
+
+Configure it in `backend/.env`:
+
+```text
+ESCALATION_SEVERITY_THRESHOLD=8
+```
+
+Default:
+
+```text
+8
+```
+
+Incidents at or above this severity can trigger escalation recommendations and audit events.
+
+This simulates how an internal Trust & Safety operations team might define thresholds for human review, policy escalation, security review, legal review, or fraud investigation.
+
+---
+
+### Demo Resilience
+
+The system is intentionally designed to degrade gracefully.
+
+| Dependency | If unavailable |
+|---|---|
+| OpenAI API | Uses `needs_review` fallback classification |
+| Reddit | Uses demo Reddit risk signals |
+| X / Twitter | Uses demo X risk signals |
+| Slack | Records escalation locally without sending a Slack message |
+| Regulatory page scraping | Uses curated official-source fallback records |
+
+This keeps the demo reliable while still showing how production integrations would work.
+
+The fallback behavior is part of the product design, not just a workaround. In operational risk tooling, brittle dependencies can cause missed signals. This prototype preserves the signal and routes it for human review even when an integration fails.
+
+---
+
+### Human-in-the-Loop Positioning
+
+This project is an analyst-assist prototype.
+
+It does not:
+
+- make automated enforcement decisions
+- make legal decisions
+- make account-level moderation decisions
+- replace human Trust & Safety analysts
+
+It does:
+
+- aggregate emerging signals
+- structure messy information
+- classify potential risk areas
+- recommend human review paths
+- support analyst notes
+- maintain audit trails
+- preserve source metadata
+- help reduce detection latency
+
+The intended value is not automated enforcement. The intended value is helping analysts identify, triage, and route high-signal issues more efficiently.
+
