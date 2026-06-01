@@ -224,3 +224,31 @@ nano .env
 
 ![Audit trail](docs/screenshots/audit-trail.png)
 
+
+---
+
+## API and Integration Configuration
+
+This project supports multiple external integrations. The app is intentionally designed to remain demoable even when third-party APIs are unavailable, rate-limited, paid, blocked, or missing credentials.
+
+Only the OpenAI API is required for full AI-assisted classification. Reddit, X/Twitter, and Slack are optional.
+
+---
+
+## Environment Variables
+
+Create a local backend environment file:
+
+```bash
+cd backend
+cp .env.example .env
+nano .env
+
+## 3. Verify it was added
+
+```bash
+grep -n "API and Integration Configuration" README.md
+grep -n "Reddit API" README.md
+grep -n "X / Twitter API" README.md
+grep -n "Slack Webhook" README.md
+grep -n "Demo Seed" README.md
