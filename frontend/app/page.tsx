@@ -21,6 +21,15 @@ type Incident = {
   created_at: string
 }
 
+type AuditEvent = {
+  id: number
+  incident_id?: number
+  action: string
+  actor: string
+  details?: string
+  created_at: string
+}
+
 const API_BASE = 'http://localhost:8000'
 
 const FILTERS = [
@@ -40,6 +49,7 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [notesDraft, setNotesDraft] = useState('')
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
 
   useEffect(() => {
     fetchIncidents()
@@ -48,6 +58,9 @@ export default function Home() {
   useEffect(() => {
     if (selectedIncident) {
       setNotesDraft(selectedIncident.analyst_notes || '')
+      fetchAuditEvents(selectedIncident.id)
+    } else {
+      setAuditEvents([])
     }
   }, [selectedIncident])
 
@@ -60,6 +73,15 @@ export default function Home() {
       if (refreshed) {
         setSelectedIncident(refreshed)
       }
+    }
+  }
+
+  const fetchAuditEvents = async (incidentId: number) => {
+    try {
+      const res = await axios.get(`${API_BASE}/incidents/${incidentId}/audit`)
+      setAuditEvents(res.data)
+    } catch {
+      setAuditEvents([])
     }
   }
 
@@ -388,6 +410,51 @@ export default function Home() {
                   >
                     Save & Close
                   </button>
+                </div>
+
+                <div className="mb-4 rounded-xl bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Audit Trail
+                    </p>
+                    <button
+                      onClick={() => fetchAuditEvents(selectedIncident.id)}
+                      className="rounded-lg border bg-white px-2 py-1 text-xs"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {auditEvents.length === 0 ? (
+                      <p className="text-sm text-slate-500">
+                        No audit events recorded yet.
+                      </p>
+                    ) : (
+                      auditEvents.map((event) => (
+                        <div key={event.id} className="rounded-lg border bg-white p-3">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-800">
+                              {event.action.replaceAll('_', ' ')}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(event.created_at).toLocaleString()}
+                            </p>
+                          </div>
+
+                          <p className="text-xs text-slate-500">
+                            Actor: {event.actor}
+                          </p>
+
+                          {event.details && (
+                            <p className="mt-2 text-sm leading-5 text-slate-700">
+                              {event.details}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
